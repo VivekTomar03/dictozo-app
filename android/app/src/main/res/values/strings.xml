@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">DictozoApp</string>
+    <string name="accessibility_service_description">Dictozo Assistant automatically identifies words you have saved while you read and shows definitions on the screen.</string>
+</resources>

@@ -1,0 +1,15 @@
+pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'DictozoApp'
+
+include ':app'
+
+// Manual Linking for libraries that fail autolinking in 0.76
+include ':react-native-sqlite-storage'
+project(':react-native-sqlite-storage').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-sqlite-storage/platforms/android')
+
+include ':react-native-webview'
+project(':react-native-webview').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-webview/android')
+
+includeBuild("../node_modules/@react-native/gradle-plugin")
