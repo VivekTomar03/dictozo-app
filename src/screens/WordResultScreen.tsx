@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, TextInput, Linking } from 'react-native';
 import { useStore } from '../store/useStore';
 import { rf, rs } from '../utils/responsive';
 import { getWordDefinitions, getTranslation } from '../services/api';
+import { saveWord } from '../services/db';
 import { BackIcon, EditIcon, SaveIcon, CheckIcon } from '../components/Icons';
 import { Skeleton } from '../components/Skeleton';
 
@@ -44,6 +45,8 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
 
   const email = useStore(s => s.email);
   const plan = useStore(s => s.plan);
+  const planName = useStore(s => s.planName);
+  const trChars = useStore(s => s.trChars);
   const language = useStore(s => s.language);
   const favourites = useStore(s => s.favourites);
   const setFavourites = useStore(s => s.setFavourites);
@@ -106,6 +109,21 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
   };
 
   const loadTranslation = async (lang: string = targetLang) => {
+    const limit = plan?._tr ?? 500;
+    if (trChars >= limit) {
+      setError('Translation limit reached. Please upgrade your plan to translate more.');
+      Alert.alert(
+        'Limit Reached', 
+        'Translation limit reached. Please upgrade your plan.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade to Pro', onPress: () => Linking.openURL('https://dictozo.com/#pricing') }
+        ]
+      );
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -133,7 +151,14 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
     // 2. Quota check
     const limit = plan?._sa ?? 20;
     if (Object.keys(favourites).length >= limit) {
-      Alert.alert('Limit Reached', 'Save limit reached. Please upgrade your plan.');
+      Alert.alert(
+        'Limit Reached', 
+        'Save limit reached. Please upgrade your plan to save more words.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade to Pro', onPress: () => Linking.openURL('https://dictozo.com/#pricing') }
+        ]
+      );
       return;
     }
 
@@ -153,6 +178,12 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
       const entryJson = JSON.stringify(entry);
       const nextFavs = { ...favourites, [wordKey]: entryJson };
       const nextFavsJson = JSON.stringify(nextFavs);
+
+      // Save to SQLite so Accessibility Service can highlight it across apps
+      const definitionText = definitions.length > 0 
+        ? definitions[0].definition 
+        : (translation?.translatedText || 'No definition found.');
+      await saveWord(word, definitionText);
 
       // 4. Save to Server
       const { syncUser } = await import('../services/api');
@@ -311,7 +342,20 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
           <Text style={styles.wordTitle}>{word}</Text>
           <TouchableOpacity
             style={styles.editIconButton}
-            onPress={() => setReplaceModalVisible(true)}
+            onPress={() => {
+              if (planName.toLowerCase() === 'free') {
+                Alert.alert(
+                  'Premium Feature', 
+                  'Replacing words is a paid feature. Please upgrade to Pro.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Upgrade to Pro', onPress: () => Linking.openURL('https://dictozo.com/#pricing') }
+                  ]
+                );
+                return;
+              }
+              setReplaceModalVisible(true);
+            }}
           >
             <EditIcon size={20} color={theme.primary} />
           </TouchableOpacity>
@@ -336,6 +380,17 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
             <View style={styles.replacementHeader}>
               <Text style={styles.replacementLabel}>Replacement</Text>
               <TouchableOpacity onPress={() => {
+                if (planName.toLowerCase() === 'free') {
+                  Alert.alert(
+                    'Premium Feature', 
+                    'Replacing words is a paid feature. Please upgrade to Pro.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Upgrade to Pro', onPress: () => Linking.openURL('https://dictozo.com/#pricing') }
+                    ]
+                  );
+                  return;
+                }
                 setReplacementWord(existingReplacement);
                 setReplaceModalVisible(true);
               }}>
@@ -394,7 +449,20 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.btn, styles.secondaryBtn]}
-          onPress={() => setCustomModalVisible(true)}
+          onPress={() => {
+            if (planName.toLowerCase() === 'free') {
+              Alert.alert(
+                'Premium Feature', 
+                'Saving custom words is a paid feature. Please upgrade to Pro.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Upgrade to Pro', onPress: () => Linking.openURL('https://dictozo.com/#pricing') }
+                ]
+              );
+              return;
+            }
+            setCustomModalVisible(true);
+          }}
         >
           <EditIcon size={20} color={theme.primary} />
           <Text style={styles.secondaryBtnText}>Custom Def</Text>

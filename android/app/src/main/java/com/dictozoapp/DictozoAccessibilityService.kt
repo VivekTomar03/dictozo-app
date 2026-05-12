@@ -108,7 +108,7 @@ class DictozoAccessibilityService : AccessibilityService() {
                 val lowerFull = elementText.lowercase().trim()
                 if (savedWords.containsKey(lowerFull)) {
                     foundWords.add(lowerFull)
-                } else if (elementText.length < 100) { // Only split small/medium text blocks
+                } else if (elementText.length < 5000) { // Split small/medium/large text blocks
                     // 2. Split by non-alphanumeric
                     val subWords = elementText.split(Regex("[^a-zA-Z0-9-']"))
                     for (subWord in subWords) {

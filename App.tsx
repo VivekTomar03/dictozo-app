@@ -11,6 +11,7 @@ import {
   NativeModules,
   useColorScheme,
   Alert,
+  Linking,
 } from 'react-native';
 import { EmailScreen } from './src/screens/auth/EmailScreen';
 import { OtpScreen } from './src/screens/auth/OtpScreen';
@@ -133,6 +134,16 @@ const PopupApp = ({ processText }: { processText: string }) => {
   const email = AppStorage.getEmail();
 
   useEffect(() => {
+    if (!email) {
+      setLoading(false);
+      Alert.alert(
+        'Login Required',
+        'Please open the Dictozo app and login to view meanings and save words.',
+        [{ text: 'OK', onPress: handleClose }]
+      );
+      return;
+    }
+
     const load = async () => {
       try {
         // Start DB and check saved status in parallel
@@ -162,7 +173,7 @@ const PopupApp = ({ processText }: { processText: string }) => {
       }
     };
     load();
-  }, [processText]);
+  }, [processText, email]);
 
   const handleClose = () => {
     // Use finishActivity() instead of exitApp() — returns to the previous app
@@ -182,6 +193,25 @@ const PopupApp = ({ processText }: { processText: string }) => {
         'Login Required',
         'Please open the Dictozo app and login to save words and sync them across your devices.',
         [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Quota check
+    const plans = AppStorage.getPlans();
+    const planName = AppStorage.getPlanName();
+    const currentPlan = plans.find((p: any) => p.plan_name === planName);
+    const limit = currentPlan?._sa ?? 20;
+    
+    const favs = AppStorage.getFavourites();
+    if (Object.keys(favs).length >= limit) {
+      Alert.alert(
+        'Limit Reached', 
+        'Save limit reached. Please upgrade your plan to save more words.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade to Pro', onPress: () => Linking.openURL('https://dictozo.com/#pricing') }
+        ]
       );
       return;
     }
@@ -236,6 +266,12 @@ const PopupApp = ({ processText }: { processText: string }) => {
             <View style={{ marginTop: 20 }}>
               <Skeleton width="100%" height={50} borderRadius={12} />
             </View>
+          </View>
+        ) : !email ? (
+          <View style={{ paddingVertical: 16 }}>
+            <Text style={[styles.popupDefinition, { textAlign: 'center', color: theme.textMuted }]}>
+              Please login to the Dictozo app to view meanings and save words.
+            </Text>
           </View>
         ) : (
           <View>

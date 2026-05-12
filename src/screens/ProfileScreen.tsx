@@ -78,13 +78,6 @@ export const ProfileScreen = () => {
             </View>
           </View>
 
-          <View style={styles.usageRow}>
-            <View style={styles.usageIcon}>
-              <LanguageIcon size={rs(18)} color={theme.primary} />
-            </View>
-            <Text style={styles.usageLabel}>Remaining Translation Chars</Text>
-            <Text style={styles.usageValue}>{trChars}</Text>
-          </View>
 
           <TouchableOpacity 
             style={styles.upgradeBtn}

@@ -88,7 +88,7 @@ export const syncUser = async (
   },
 ): Promise<SyncResponse> => {
   const res = await client.put('/users/update', { email, user: userData });
-  console.log('[API] syncUser response:', res.data);
+  // console.log('[API] syncUser response:', res.data);
   return res.data;
 };
 
@@ -176,19 +176,19 @@ export const shortenUrl = async (url: string): Promise<{ shortUrl: string }> => 
 const platform = Platform.OS === 'android' ? 'mobile-android' : 'mobile-ios';
 
 export const logError = (email: string, error: string, version: string) =>
-  client.post('/errors', { email, error, platform, version }).catch(() => {});
+  client.post('/errors', { email, error, platform, version }).catch(() => { });
 
 export const trackAnalytics = (email: string, event: string, data?: object) =>
-  client.post('/analytics', { email, event, data }).catch(() => {});
+  client.post('/analytics', { email, event, data }).catch(() => { });
 
 export const trackInstall = (email: string, version: string, os: string) =>
-  client.post('/installs', { email, platform, version, os }).catch(() => {});
+  client.post('/installs', { email, platform, version, os }).catch(() => { });
 
 export const trackUpdate = (email: string, version: string) =>
-  client.post('/updates', { email, version, platform }).catch(() => {});
+  client.post('/updates', { email, version, platform }).catch(() => { });
 
 export const trackStartup = (email: string) =>
-  client.post('/startups', { email, platform }).catch(() => {});
+  client.post('/startups', { email, platform }).catch(() => { });
 
 export const trackEvent = (email: string, name: string, data?: object) =>
-  client.post('/events', { email, name, data }).catch(() => {});
+  client.post('/events', { email, name, data }).catch(() => { });

@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { rf, rs } from '../utils/responsive';
 import { AccessibilityIcon, OverlayIcon, CloseIcon, ChevronRightIcon, CheckIcon } from './Icons';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Step {
   id: number;
@@ -71,27 +73,29 @@ export const PermissionModal = ({ visible, onClose, type, onEnable }: Permission
             </Text>
           </View>
 
-          <ScrollView style={styles.stepList} showsVerticalScrollIndicator={false}>
-            {steps.map((step, index) => (
-              <React.Fragment key={step.id}>
-                <View style={styles.stepItem}>
-                  <View style={styles.stepNumberCircle}>
-                    <Text style={styles.stepNumberText}>{step.id}</Text>
+          <View style={styles.listContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {steps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepNumberCircle}>
+                      <Text style={styles.stepNumberText}>{step.id}</Text>
+                    </View>
+                    <View style={styles.stepInfo}>
+                      <Text style={styles.stepText}>{step.text}</Text>
+                      <Text style={styles.stepSubText}>{step.subText}</Text>
+                    </View>
+                    <ChevronRightIcon size={rs(20)} color={theme.border} />
                   </View>
-                  <View style={styles.stepInfo}>
-                    <Text style={styles.stepText}>{step.text}</Text>
-                    <Text style={styles.stepSubText}>{step.subText}</Text>
-                  </View>
-                  <ChevronRightIcon size={rs(20)} color={theme.border} />
-                </View>
-                {index < steps.length - 1 && (
-                  <View style={styles.connectorContainer}>
-                    <View style={styles.connector} />
-                  </View>
-                )}
-              </React.Fragment>
-            ))}
-          </ScrollView>
+                  {index < steps.length - 1 && (
+                    <View style={styles.connectorContainer}>
+                      <View style={styles.connector} />
+                    </View>
+                  )}
+                </React.Fragment>
+              ))}
+            </ScrollView>
+          </View>
 
           <TouchableOpacity style={styles.enableBtn} onPress={onEnable}>
             <CheckIcon size={rs(18)} color="#FFF" strokeWidth={4} />
@@ -108,13 +112,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: rs(24),
+    padding: rs(20),
   },
   content: {
     backgroundColor: theme.surface,
-    borderRadius: rs(32),
-    padding: rs(24),
-    maxHeight: '90%',
+    borderRadius: rs(24),
+    padding: rs(20),
+    maxHeight: SCREEN_HEIGHT * 0.8,
   },
   closeBtn: {
     alignSelf: 'flex-end',
@@ -124,16 +128,16 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: rs(24),
+    marginBottom: rs(16),
   },
   iconCircle: {
-    width: rs(72),
-    height: rs(72),
-    borderRadius: rs(36),
+    width: rs(64),
+    height: rs(64),
+    borderRadius: rs(32),
     backgroundColor: theme.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: rs(16),
+    marginBottom: rs(12),
   },
   title: {
     fontSize: rf(20),
@@ -148,8 +152,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: rf(22),
   },
-  stepList: {
+  listContainer: {
+    flexShrink: 1,
     marginBottom: rs(24),
+  },
+  stepList: {
+    flexGrow: 0,
   },
   stepItem: {
     flexDirection: 'row',
