@@ -20,8 +20,8 @@ class DictozoModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun checkAccessibilityPermission(promise: Promise) {
         try {
-            val am = reactApplicationContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-            val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            val am = reactApplicationContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
+            val enabledServices = am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
             
             var isEnabled = false
             for (service in enabledServices) {
@@ -30,6 +30,18 @@ class DictozoModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                     break
                 }
             }
+
+            // Secondary check via Settings.Secure just in case
+            if (!isEnabled) {
+                val settingsEnabled = android.provider.Settings.Secure.getString(
+                    reactApplicationContext.contentResolver,
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                )
+                if (settingsEnabled?.contains(reactApplicationContext.packageName) == true) {
+                    isEnabled = true
+                }
+            }
+
             promise.resolve(isEnabled)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)
@@ -66,5 +78,17 @@ class DictozoModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     @ReactMethod
     fun finishActivity() {
         currentActivity?.finish()
+    }
+
+    @ReactMethod
+    fun setLoginStatus(isLoggedIn: Boolean) {
+        val prefs = reactApplicationContext.getSharedPreferences("dictozo_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("is_verified", isLoggedIn).apply()
+    }
+
+    @ReactMethod
+    fun clearLocalDatabase() {
+        val dbHelper = DictionaryDbHelper(reactApplicationContext)
+        dbHelper.clearAllWords()
     }
 }

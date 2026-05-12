@@ -1,4 +1,7 @@
 import { MMKV } from 'react-native-mmkv';
+import { NativeModules } from 'react-native';
+
+const { DictozoModule } = NativeModules;
 
 let _storage: MMKV | null = null;
 
@@ -22,7 +25,12 @@ const getStorage = () => {
 export const AppStorage = {
   // ─── Auth ──────────────────────────────────────────────────────────────────
   isVerified: () => getStorage()?.getString('verified') === '1',
-  setVerified: (v: boolean) => getStorage()?.set('verified', v ? '1' : '0'),
+  setVerified: (v: boolean) => {
+    getStorage()?.set('verified', v ? '1' : '0');
+    if (DictozoModule?.setLoginStatus) {
+      DictozoModule.setLoginStatus(v);
+    }
+  },
 
   getEmail: () => getStorage()?.getString('user_email') ?? '',
   setEmail: (email: string) => getStorage()?.set('user_email', email),
@@ -113,16 +121,12 @@ export const AppStorage = {
   clearSession: () => {
     const s = getStorage();
     if (!s) return;
-    s.delete('verified');
-    s.delete('user_email');
-    s.delete('_u');
-    s.delete('char');
-    s.delete('local-lang');
-    s.delete('favourites');
-    s.delete('mastered');
-    s.delete('searchedWords');
-    s.delete('plans');
-    s.delete('otp');
-    s.delete('tempEmail');
+    s.clearAll();
+    if (DictozoModule?.setLoginStatus) {
+      DictozoModule.setLoginStatus(false);
+    }
+    if (DictozoModule?.clearLocalDatabase) {
+      DictozoModule.clearLocalDatabase();
+    }
   },
 };

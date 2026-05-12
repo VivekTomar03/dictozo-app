@@ -40,6 +40,7 @@ interface AppState {
   }) => void;
 
   setPlan: (plan: Plan) => void;
+  setPlanName: (name: string) => void;
   setFavourites: (favs: Record<string, string>) => void;
   setMastered: (words: Record<string, string>) => void;
   setTrChars: (n: number) => void;
@@ -73,25 +74,56 @@ export const useStore = create<AppState>((set) => ({
   // ─── User ──────────────────────────────────────────────────────────────────
   login: ({ email, planName, trChars, favourites, mastered, language, searchedWords }) => {
     try {
+      const safeEmail = email || '';
+      const safePlanName = planName || 'free';
+      const safeTrChars = trChars || 500;
+      const safeFavourites = favourites || {};
+      const safeMastered = mastered || {};
+      const safeLanguage = language || 'hi';
+      const safeSearchedWords = Array.isArray(searchedWords) ? searchedWords : [];
+
       AppStorage.setVerified(true);
-      AppStorage.setEmail(email);
-      AppStorage.setPlanName(planName);
-      AppStorage.setTranslationChars(trChars);
-      AppStorage.setFavourites(favourites);
-      AppStorage.setMastered(mastered);
-      AppStorage.setLang(language);
-      if (Array.isArray(searchedWords)) {
-        AppStorage.setSearchedWords(searchedWords);
-      }
-      set({ email, planName, trChars, favourites, mastered, language, searchedWords: Array.isArray(searchedWords) ? searchedWords : [] });
+      AppStorage.setEmail(safeEmail);
+      AppStorage.setPlanName(safePlanName);
+      AppStorage.setTranslationChars(safeTrChars);
+      AppStorage.setFavourites(safeFavourites);
+      AppStorage.setMastered(safeMastered);
+      AppStorage.setLang(safeLanguage);
+      AppStorage.setSearchedWords(safeSearchedWords);
+      
+      // Sync favourites to SQLite for Accessibility Service
+      import('../services/db').then(async ({ saveWord }) => {
+        for (const [word, dataStr] of Object.entries(safeFavourites)) {
+          try {
+            const entry = JSON.parse(dataStr as string);
+            const definition = entry.data?.[0]?.definition || entry.data?.[0]?.translatedText || '';
+            await saveWord(word, definition);
+          } catch (e) {
+            // Silently skip if fails
+          }
+        }
+      }).catch(() => {});
+
+      set({ 
+        email: safeEmail, 
+        planName: safePlanName, 
+        trChars: safeTrChars, 
+        favourites: safeFavourites, 
+        mastered: safeMastered, 
+        language: safeLanguage, 
+        searchedWords: safeSearchedWords 
+      });
     } catch (e) {
       console.error('Login error:', e);
-      // Still set basic state to avoid hang
-      set({ email, planName, trChars, favourites, mastered, language, searchedWords: [] });
+      set({ email: email || '', planName: planName || 'free', trChars: trChars || 500, favourites: favourites || {}, mastered: mastered || {}, language: language || 'hi', searchedWords: [] });
     }
   },
 
   setPlan: (plan) => set({ plan }),
+  setPlanName: (name) => {
+    AppStorage.setPlanName(name);
+    set({ planName: name });
+  },
 
   setFavourites: (favs) => {
     AppStorage.setFavourites(favs);

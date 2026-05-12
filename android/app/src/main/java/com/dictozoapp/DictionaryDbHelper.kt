@@ -47,4 +47,14 @@ class DictionaryDbHelper(private val context: Context) :
         }
         return words
     }
+
+    fun clearAllWords() {
+        try {
+            val db = writableDatabase ?: return
+            db.delete("SavedWords", null, null)
+            db.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }

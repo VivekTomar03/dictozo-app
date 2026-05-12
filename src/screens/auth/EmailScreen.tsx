@@ -10,12 +10,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { sendOTP } from '../../services/api';
 import { AppStorage } from '../../services/storage';
 import { useStore } from '../../store/useStore';
 import { btoa } from '../../utils/base64';
-import { rf } from '../../utils/responsive';
+import { rf, rs } from '../../utils/responsive';
+import { MailIcon, SendIcon, ShieldIcon, SparkleIcon } from '../../components/Icons';
 
 const theme = {
   primary: '#2EBA72',
@@ -44,11 +47,8 @@ export const EmailScreen = () => {
     setError('');
     setLoading(true);
     try {
-      // Generate 4-digit OTP client-side per spec §3
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      // Send to server to be emailed
       await sendOTP(trimmed, otp);
-      // Store encoded OTP and temp email for verification step
       AppStorage.setOtp(btoa(otp));
       AppStorage.setTempEmail(trimmed);
       setAuthStep('OTP');
@@ -63,41 +63,79 @@ export const EmailScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.inner}>
-        <View style={styles.card}>
-          <Text style={styles.logo}>DICTOZO</Text>
-          <Text style={styles.title}>Sign In</Text>
-          <Text style={styles.subtitle}>
-            We'll send a 4-digit code to your email
-          </Text>
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.heroContainer}>
+            {/* Decorative Sparkles */}
+            <View style={[styles.sparkle, { top: rs(10), left: rs(40) }]}>
+              <SparkleIcon size={rs(16)} color="#2EBA72" />
+            </View>
+            <View style={[styles.sparkle, { top: rs(50), right: rs(30) }]}>
+              <SparkleIcon size={rs(12)} color="#2EBA72" />
+            </View>
+            <View style={[styles.sparkle, { bottom: rs(40), left: rs(20) }]}>
+              <SparkleIcon size={rs(14)} color="#2EBA72" />
+            </View>
+            
+            <Image 
+              source={require('../../assets/images/logins1.png')} 
+              style={styles.heroImage}
+              resizeMode="contain"
+            />
+          </View>
 
-          <TextInput
-            style={[styles.input, error ? styles.inputError : null]}
-            placeholder="Email address"
-            placeholderTextColor={theme.textMuted}
-            value={email}
-            onChangeText={v => { setEmail(v); setError(''); }}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="send"
-            onSubmitEditing={handleSendOTP}
-          />
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <View style={styles.card}>
+            <Text style={styles.logo}>DICTOZO</Text>
+            <Text style={styles.title}>Sign In</Text>
+            <Text style={styles.subtitle}>
+              We'll send a 4-digit code to your <Text style={styles.highlight}>email</Text>
+            </Text>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSendOTP}
-            disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color={theme.surface} />
-            ) : (
-              <Text style={styles.buttonText}>Send Code</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            <View style={[styles.inputWrapper, error ? styles.inputError : null]}>
+              <MailIcon size={rs(20)} color={theme.textMuted} />
+              <TextInput
+                style={styles.input}
+                placeholder="Email address"
+                placeholderTextColor={theme.textMuted}
+                value={email}
+                onChangeText={v => { setEmail(v); setError(''); }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="send"
+                onSubmitEditing={handleSendOTP}
+              />
+            </View>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSendOTP}
+              disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={theme.surface} />
+              ) : (
+                <View style={styles.buttonInner}>
+                  <SendIcon size={rs(18)} color="#FFF" />
+                  <Text style={styles.buttonText}>Send Code</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.footer}>
+            <ShieldIcon size={rs(20)} color={theme.primary} />
+            <Text style={styles.footerText}>
+              We keep your data safe and never share it with anyone.
+            </Text>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -108,82 +146,124 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.background,
   },
-  inner: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
+  scrollContent: {
+    padding: rs(20),
+    paddingBottom: rs(40),
+    alignItems: 'center',
+  },
+  heroContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: rs(30),
+    marginBottom: rs(0),
+    zIndex: 1,
+  },
+  heroImage: {
+    width: rs(340),
+    height: rs(260),
   },
   card: {
     backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: theme.border,
+    borderRadius: rs(32),
+    padding: rs(30),
+    width: '100%',
+    marginTop: rs(-60),
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: rs(20),
+    elevation: 8,
   },
   logo: {
-    fontSize: rf(30),
+    fontSize: rf(32),
     fontWeight: '900',
     color: theme.primary,
-    letterSpacing: 1.5,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: rs(10),
   },
   title: {
-    fontSize: rf(26),
+    fontSize: rf(28),
     fontWeight: '800',
     color: theme.textDark,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: rs(10),
   },
   subtitle: {
-    fontSize: rf(18),
+    fontSize: rf(16),
     color: theme.textMuted,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: rs(30),
     lineHeight: rf(24),
   },
-  input: {
+  highlight: {
+    color: theme.primary,
+    fontWeight: 'bold',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: theme.background,
     borderWidth: 1,
     borderColor: theme.border,
-    padding: 16,
-    borderRadius: 10,
-    fontSize: rf(18),
+    paddingHorizontal: rs(15),
+    borderRadius: rs(12),
+    marginBottom: rs(8),
+  },
+  input: {
+    flex: 1,
+    padding: rs(15),
+    fontSize: rf(17),
     color: theme.textDark,
-    marginBottom: 8,
   },
   inputError: {
     borderColor: theme.error,
   },
   errorText: {
     color: theme.error,
-    fontSize: rf(15),
-    marginBottom: 12,
-    marginLeft: 4,
+    fontSize: rf(14),
+    marginBottom: rs(12),
+    textAlign: 'center',
   },
   button: {
     backgroundColor: theme.primary,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
+    padding: rs(16),
+    borderRadius: rs(14),
+    marginTop: rs(10),
     shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: rs(8),
     elevation: 4,
   },
+  buttonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: rs(10),
+  },
   buttonDisabled: {
-    opacity: 0.65,
+    opacity: 0.7,
   },
   buttonText: {
     color: theme.surface,
-    fontSize: rf(19),
-    fontWeight: '700',
+    fontSize: rf(18),
+    fontWeight: '800',
+  },
+  footer: {
+    flexDirection: 'row',
+    marginTop: rs(40),
+    paddingHorizontal: rs(40),
+    alignItems: 'center',
+    gap: rs(10),
+  },
+  footerText: {
+    fontSize: rf(14),
+    color: theme.textMuted,
+    lineHeight: rf(20),
+    flex: 1,
+  },
+  sparkle: {
+    position: 'absolute',
+    opacity: 0.6,
   },
 });

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Scro
 import { useStore } from '../store/useStore';
 import { WordResultScreen } from './WordResultScreen';
 import { SearchIcon } from '../components/Icons';
-import { rf } from '../utils/responsive';
+import { rf, rs } from '../utils/responsive';
 
 const theme = {
   primary: '#2EBA72',
@@ -74,36 +74,35 @@ export const HomeScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  header: { padding: 20, backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border },
+  header: { padding: rs(20), backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border },
   title: { fontSize: rf(28), fontWeight: '900', color: theme.primary, letterSpacing: 1 },
-  content: { padding: 20 },
+  content: { padding: rs(20) },
   searchContainer: {
     flexDirection: 'row',
     backgroundColor: theme.surface,
-    borderRadius: 16,
+    borderRadius: rs(16),
     borderWidth: 1,
     borderColor: theme.border,
-    marginBottom: 32,
+    marginBottom: rs(32),
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8
+    shadowRadius: rs(8)
   },
-  searchInput: { flex: 1, padding: 16, fontSize: rf(18), color: theme.textDark },
-  searchBtn: { paddingHorizontal: 20, justifyContent: 'center', backgroundColor: theme.primaryLight },
-  searchBtnText: { fontSize: 24 },
-  sectionTitle: { fontSize: rf(20), fontWeight: '700', color: theme.textDark, marginBottom: 16 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  searchInput: { flex: 1, padding: rs(16), fontSize: rf(18), color: theme.textDark },
+  searchBtn: { paddingHorizontal: rs(20), justifyContent: 'center' },
+  sectionTitle: { fontSize: rf(20), fontWeight: '700', color: theme.textDark, marginBottom: rs(16) },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: rs(10) },
   chip: {
     backgroundColor: theme.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: rs(20),
     borderWidth: 1,
     borderColor: theme.border
   },
   chipText: { color: theme.textDark, fontSize: rf(16), fontWeight: '500' },
-  emptyText: { color: theme.textMuted, fontSize: rf(16), marginTop: 10 }
+  emptyText: { color: theme.textMuted, fontSize: rf(16), marginTop: rs(10) }
 });

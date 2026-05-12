@@ -10,6 +10,7 @@ import {
   BackHandler,
   NativeModules,
   useColorScheme,
+  Alert,
 } from 'react-native';
 import { EmailScreen } from './src/screens/auth/EmailScreen';
 import { OtpScreen } from './src/screens/auth/OtpScreen';
@@ -22,7 +23,7 @@ import { Skeleton } from './src/components/Skeleton';
 import { getCachedDefinition, cacheDefinition, saveWord, initDB } from './src/services/db';
 import { getWordDefinitions } from './src/services/api';
 import { AppStorage } from './src/services/storage';
-import { rf } from './src/utils/responsive';
+import { rf, rs } from './src/utils/responsive';
 import { runStartupSync } from './src/services/startup';
 import { useStore, Tab } from './src/store/useStore';
 import { SearchIcon, BookIcon, CheckIcon, UserIcon } from './src/components/Icons';
@@ -133,8 +134,15 @@ const PopupApp = ({ processText }: { processText: string }) => {
 
   useEffect(() => {
     const load = async () => {
-      await initDB();
       try {
+        // Start DB and check saved status in parallel
+        initDB().then(() => {
+          const wordKey = processText.toUpperCase();
+          if (AppStorage.getFavourites()[wordKey]) {
+            setSaved(true);
+          }
+        });
+
         // 1. Check SQLite offline cache first
         const cached = await getCachedDefinition(processText);
         if (cached) {
@@ -167,6 +175,17 @@ const PopupApp = ({ processText }: { processText: string }) => {
 
   const handleSave = async () => {
     if (!processText || !definition || saved || saving) return;
+
+    // Check login
+    if (!email) {
+      Alert.alert(
+        'Login Required',
+        'Please open the Dictozo app and login to save words and sync them across your devices.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       // Save to local SQLite (for accessibility service)
@@ -280,8 +299,16 @@ function App({ processText }: AppProps): React.JSX.Element {
 
       if (!isVerified || !email) {
         console.log('[Bootstrap] Redirecting to Auth');
+        if (DictozoModule?.setLoginStatus) {
+          DictozoModule.setLoginStatus(false);
+        }
         navigateTo('Auth');
         return;
+      }
+
+      // Restore native sync
+      if (DictozoModule?.setLoginStatus) {
+        DictozoModule.setLoginStatus(true);
       }
 
       // Restore local session immediately (so UI shows fast)
@@ -348,18 +375,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.background,
   },
   splashLogo: {
-    fontSize: 36,
+    fontSize: rf(36),
     fontWeight: '900',
     color: theme.primary,
     letterSpacing: 2,
   },
   tabBar: {
     flexDirection: 'row',
-    height: 72,
+    height: rs(72),
     backgroundColor: theme.surface,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    paddingBottom: 5,
+    paddingBottom: rs(5),
   },
   tabItem: {
     flex: 1,
@@ -367,19 +394,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 13,
+    fontSize: rf(13),
     color: theme.textMuted,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: rs(2),
   },
   tabLabelActive: {
     color: theme.primary,
   },
   iconContainer: {
-    height: 30,
+    height: rs(30),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4
+    marginBottom: rs(4)
   },
   popupContainer: {
     flex: 1,
@@ -391,25 +418,25 @@ const styles = StyleSheet.create({
   },
   popupContent: {
     backgroundColor: theme.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-    minHeight: 300,
+    borderTopLeftRadius: rs(24),
+    borderTopRightRadius: rs(24),
+    padding: rs(24),
+    paddingBottom: rs(40),
+    minHeight: rs(300),
     elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
-    shadowRadius: 16,
+    shadowRadius: rs(16),
   },
   popupHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: rs(20),
   },
   popupLogo: {
-    fontSize: 18,
+    fontSize: rf(18),
     fontWeight: '900',
     color: theme.primary,
     letterSpacing: 1,
@@ -418,44 +445,44 @@ const styles = StyleSheet.create({
     fontSize: rf(26),
     fontWeight: 'bold',
     color: theme.textDark,
-    marginBottom: 16,
+    marginBottom: rs(16),
     textTransform: 'capitalize',
   },
   closeButton: {
-    padding: 8,
+    padding: rs(8),
     backgroundColor: theme.background,
-    borderRadius: 20,
+    borderRadius: rs(20),
   },
   closeButtonText: {
-    fontSize: 20,
+    fontSize: rf(20),
     color: theme.textMuted,
     fontWeight: 'bold',
   },
   loader: {
-    marginTop: 30,
+    marginTop: rs(30),
   },
   definitionBox: {
     backgroundColor: theme.primaryLight,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    padding: rs(16),
+    borderRadius: rs(12),
+    marginBottom: rs(24),
     borderWidth: 1,
     borderColor: `${theme.primary}30`,
   },
   popupDefinition: {
-    fontSize: 18,
+    fontSize: rf(18),
     color: theme.textDark,
-    lineHeight: 28,
+    lineHeight: rf(28),
   },
   saveButton: {
     backgroundColor: theme.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: rs(12),
+    paddingVertical: rs(16),
     alignItems: 'center',
     shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: rs(8),
     elevation: 4,
   },
   saveButtonDone: {
@@ -463,7 +490,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: theme.surface,
-    fontSize: 20,
+    fontSize: rf(20),
     fontWeight: '700',
     letterSpacing: 0.5,
   },

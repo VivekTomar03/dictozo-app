@@ -13,6 +13,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.content.Context
+import android.content.SharedPreferences
 
 class DictozoAccessibilityService : AccessibilityService() {
 
@@ -40,16 +42,28 @@ class DictozoAccessibilityService : AccessibilityService() {
 
     private fun syncDictionary() {
         val now = System.currentTimeMillis()
-        if (now - lastDbSync > 5000) { // Max sync every 5 seconds
+        if (now - lastDbSync > 2000) { // Max sync every 2 seconds
             savedWords = dbHelper.getSavedWords()
             lastDbSync = now
-            Log.d("Dictozo", "Dictionary Synced. Words: ${savedWords.size}")
+            if (savedWords.isNotEmpty()) {
+                Log.d("Dictozo", "Dictionary Synced. Words: ${savedWords.size}")
+            }
         }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && 
-            event.eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED) return
+            event.eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED &&
+            event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) return
+
+        // 1. Check if user is logged in
+        val prefs = getSharedPreferences("dictozo_prefs", Context.MODE_PRIVATE)
+        val isVerified = prefs.getBoolean("is_verified", false)
+        if (!isVerified) {
+            overlayView?.visibility = View.GONE
+            return
+        }
 
         syncDictionary()
         if (savedWords.isEmpty()) return
@@ -82,33 +96,37 @@ class DictozoAccessibilityService : AccessibilityService() {
 
     private fun extractTextFromNode(node: AccessibilityNodeInfo?, foundWords: MutableSet<String>) {
         if (node == null) return
+        if (!node.isVisibleToUser) return
 
-        if (node.text != null && node.text.isNotBlank()) {
-            val elementText = node.text.toString().trim()
-            
-            // Allow exact matching (for phrases or hyphenated words)
-            val lowerElement = elementText.lowercase()
-            if (savedWords.containsKey(lowerElement)) {
-                foundWords.add(lowerElement)
-            } else {
-                // Check sub-words
-                val subWords = elementText.split(Regex("[^a-zA-Z0-9-]"))
-                for (subWord in subWords) {
-                    if (subWord.length > 2) { // Minimum word length filter
-                        val lowerSubWord = subWord.lowercase()
-                        if (savedWords.containsKey(lowerSubWord)) {
-                            foundWords.add(lowerSubWord)
+        // OPTIMIZATION: Only process text from leaf nodes (nodes with no children)
+        // This prevents processing the same text multiple times at different levels
+        if (node.childCount == 0) {
+            if (node.text != null && node.text.isNotBlank()) {
+                val elementText = node.text.toString()
+                
+                // 1. Exact match check
+                val lowerFull = elementText.lowercase().trim()
+                if (savedWords.containsKey(lowerFull)) {
+                    foundWords.add(lowerFull)
+                } else if (elementText.length < 100) { // Only split small/medium text blocks
+                    // 2. Split by non-alphanumeric
+                    val subWords = elementText.split(Regex("[^a-zA-Z0-9-']"))
+                    for (subWord in subWords) {
+                        val cleaned = subWord.trim().lowercase()
+                        if (cleaned.length > 2 && savedWords.containsKey(cleaned)) {
+                            foundWords.add(cleaned)
                         }
                     }
                 }
             }
         }
 
+        // Recursively visit children
         for (i in 0 until node.childCount) {
             val child = node.getChild(i)
             if (child != null) {
                 extractTextFromNode(child, foundWords)
-                child.recycle() // Important for memory management
+                child.recycle() 
             }
         }
     }
@@ -121,8 +139,14 @@ class DictozoAccessibilityService : AccessibilityService() {
         overlayView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
-            setPadding(30, 30, 30, 30)
-            elevation = 15f
+            setPadding(40, 40, 40, 40)
+            elevation = 25f
+            // Add a thin green border
+            val border = android.graphics.drawable.GradientDrawable()
+            border.setColor(Color.WHITE)
+            border.setStroke(4, Color.parseColor("#2EBA72"))
+            border.cornerRadius = 20f
+            background = border
             visibility = View.GONE
         }
         
@@ -139,7 +163,7 @@ class DictozoAccessibilityService : AccessibilityService() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = 100 // Slight bottom margin
+            y = 250 // Move it higher up (was 100)
         }
         
         try {
@@ -204,6 +228,7 @@ class DictozoAccessibilityService : AccessibilityService() {
             }
 
             overlayView?.visibility = View.VISIBLE
+            Log.i("Dictozo", "Popup is now VISIBLE at Y=${overlayView?.y}")
 
             // Auto-hide after display time
             overlayView?.tag = System.currentTimeMillis()

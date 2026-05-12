@@ -8,14 +8,17 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-  NativeModules,
   Platform,
+  Image,
+  ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { syncUser, sendOTP, fetchPlans, checkTrialExpiry, trackStartup } from '../../services/api';
 import { AppStorage } from '../../services/storage';
 import { useStore } from '../../store/useStore';
 import { atob, btoa } from '../../utils/base64';
-import { rf } from '../../utils/responsive';
+import { rf, rs } from '../../utils/responsive';
+import { ClockIcon, ShieldIcon, SendIcon, ArrowLeftIcon, SparkleIcon } from '../../components/Icons';
 
 const theme = {
   primary: '#2EBA72',
@@ -25,6 +28,7 @@ const theme = {
   textMuted: '#6B7280',
   border: '#E5E7EB',
   error: '#EF4444',
+  lightGreen: '#E8F7F0',
 };
 
 const APP_VERSION = '1.0.0';
@@ -49,7 +53,6 @@ export const OtpScreen = () => {
 
   const email = AppStorage.getTempEmail();
 
-  // Resend countdown
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
@@ -57,7 +60,10 @@ export const OtpScreen = () => {
   }, [resendCooldown]);
 
   const handleChange = (val: string, idx: number) => {
-    if (val.length > 1) return; // single digit only
+    if (val.length > 1) {
+      // Handle paste if needed, but for now just single digit
+      val = val[0];
+    }
     const next = [...otp];
     next[idx] = val;
     setOtp(next);
@@ -78,7 +84,6 @@ export const OtpScreen = () => {
       return;
     }
 
-    // Client-side OTP verification per spec §3
     const stored = AppStorage.getOtp();
     let decoded = '';
     try {
@@ -95,29 +100,20 @@ export const OtpScreen = () => {
 
     setLoading(true);
     try {
-      // Sync user data with server per spec §3 step 6
       const syncRes = await syncUser(email, {
         language: AppStorage.getLang(),
         open_count: 1,
       });
 
-      if (!syncRes.status) {
-        throw new Error('Sync failed');
-      }
+      if (!syncRes.status) throw new Error('Sync failed');
 
-      const { plan_name, tr_chars, favourites, language } = syncRes.data;
+      const { plan_name, tr_chars, favourites, language, mastered } = syncRes.data;
 
-      // Parse server favourites
       let parsedFavourites: Record<string, string> = {};
       let parsedMastered: Record<string, string> = {};
-      try {
-        parsedFavourites = JSON.parse(favourites ?? '{}');
-      } catch { /* keep empty */ }
-      try {
-        parsedMastered = JSON.parse(mastered ?? '{}');
-      } catch { /* keep empty */ }
+      try { parsedFavourites = JSON.parse(favourites ?? '{}'); } catch { }
+      try { parsedMastered = JSON.parse(mastered ?? '{}'); } catch { }
 
-      // Persist session
       login({
         email,
         planName: plan_name,
@@ -128,22 +124,17 @@ export const OtpScreen = () => {
         searchedWords: AppStorage.getSearchedWords(),
       });
 
-      // Clean up temp auth storage
       AppStorage.clearOtp();
       AppStorage.clearTempEmail();
 
-      // Fetch plans and trial expiry in background
-      fetchPlans()
-        .then(plans => { AppStorage.setPlans(plans); setPlan(plans.find((p: any) => p.name === plan_name) ?? plans[0]); })
-        .catch(() => {});
+      fetchPlans().then(plans => {
+        AppStorage.setPlans(plans);
+        setPlan(plans.find((p: any) => p.name === plan_name) ?? plans[0]);
+      }).catch(() => {});
 
-      checkTrialExpiry(email)
-        .then(res => setTrialDaysLeft(res.days))
-        .catch(() => {});
-
+      checkTrialExpiry(email).then(res => setTrialDaysLeft(res.days)).catch(() => {});
       trackStartup(email);
 
-      // First install tracking
       if (!AppStorage.getInstallDate()) {
         AppStorage.setInstallDate(new Date().toISOString());
         AppStorage.setInstallVersion(APP_VERSION);
@@ -175,124 +166,184 @@ export const OtpScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.inner}>
-        <View style={styles.card}>
-          <Text style={styles.logo}>DICTOZO</Text>
-          <Text style={styles.title}>Check your email</Text>
-          <Text style={styles.subtitle}>
-            We sent a 4-digit code to{'\n'}
-            <Text style={styles.emailText}>{email}</Text>
-          </Text>
-
-          <View style={styles.otpRow}>
-            {otp.map((digit, i) => (
-              <TextInput
-                key={i}
-                ref={refs[i]}
-                style={[styles.otpBox, error ? styles.otpBoxError : null, digit ? styles.otpBoxFilled : null]}
-                value={digit}
-                onChangeText={v => handleChange(v, i)}
-                onKeyPress={e => handleKeyPress(e, i)}
-                keyboardType="number-pad"
-                maxLength={1}
-                selectTextOnFocus
-                autoFocus={i === 0}
-              />
-            ))}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.heroContainer}>
+            {/* Decorative Sparkles */}
+            <View style={[styles.sparkle, { top: rs(30), left: rs(40) }]}>
+              <SparkleIcon size={rs(16)} color="#2EBA72" />
+            </View>
+            <View style={[styles.sparkle, { top: rs(70), right: rs(30) }]}>
+              <SparkleIcon size={rs(12)} color="#2EBA72" />
+            </View>
+            
+            <Image 
+              source={require('../../assets/images/logins1.png')} 
+              style={styles.heroImage}
+              resizeMode="contain"
+            />
           </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <View style={styles.card}>
+            <Text style={styles.logo}>DICTOZO</Text>
+            <Text style={styles.title}>Check your email</Text>
+            <Text style={styles.subtitle}>
+              We sent a 4-digit code to{'\n'}
+              <Text style={styles.emailText}>{email}</Text>
+            </Text>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleVerify}
-            disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color={theme.surface} />
-            ) : (
-              <Text style={styles.buttonText}>Verify</Text>
-            )}
-          </TouchableOpacity>
+            <View style={styles.otpRow}>
+              {otp.map((digit, i) => (
+                <TextInput
+                  key={i}
+                  ref={refs[i]}
+                  style={[
+                    styles.otpBox, 
+                    error ? styles.otpBoxError : null, 
+                    digit ? styles.otpBoxFilled : null
+                  ]}
+                  value={digit}
+                  onChangeText={v => handleChange(v, i)}
+                  onKeyPress={e => handleKeyPress(e, i)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  selectTextOnFocus
+                  autoFocus={i === 0}
+                />
+              ))}
+            </View>
 
-          <View style={styles.resendRow}>
-            <Text style={styles.resendLabel}>Didn't receive it? </Text>
-            <TouchableOpacity onPress={handleResend} disabled={resendCooldown > 0}>
-              <Text style={[styles.resendLink, resendCooldown > 0 && styles.resendLinkDisabled]}>
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
+            <View style={styles.timerRow}>
+              <ClockIcon size={rs(16)} color={theme.textMuted} />
+              <Text style={styles.timerText}>
+                Code expires in <Text style={styles.timerHighlight}>{resendCooldown}s</Text>
               </Text>
+            </View>
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleVerify}
+              disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={theme.surface} />
+              ) : (
+                <View style={styles.buttonInner}>
+                  <ShieldIcon size={rs(18)} color="#FFF" />
+                  <Text style={styles.buttonText}>Verify</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.line} />
+              <Text style={styles.dividerText}>Didn't receive it?</Text>
+              <View style={styles.line} />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.resendBtn, resendCooldown > 0 && styles.resendBtnDisabled]} 
+              onPress={handleResend}
+              disabled={resendCooldown > 0}
+            >
+              <SendIcon size={rs(18)} color={resendCooldown > 0 ? theme.textMuted : theme.primary} />
+              <Text style={[styles.resendBtnText, resendCooldown > 0 && styles.resendBtnTextDisabled]}>
+                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code now'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setAuthStep('Email')} style={styles.backButton}>
+              <ArrowLeftIcon size={rs(18)} color={theme.primary} />
+              <Text style={styles.backText}>Change email</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => setAuthStep('Email')} style={styles.backButton}>
-            <Text style={styles.backText}>← Change email</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+          <View style={styles.footer}>
+            <ShieldIcon size={rs(20)} color={theme.primary} />
+            <Text style={styles.footerText}>
+              We keep your data safe and never share it with anyone.
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
+  container: { flex: 1, backgroundColor: theme.background },
+  scrollContent: {
+    padding: rs(20),
+    paddingBottom: rs(40),
+    alignItems: 'center',
   },
-  inner: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
+  heroContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: rs(20),
+    zIndex: 1,
+  },
+  heroImage: {
+    width: rs(300),
+    height: rs(220),
+  },
+  sparkle: {
+    position: 'absolute',
+    opacity: 0.6,
   },
   card: {
     backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: theme.border,
+    borderRadius: rs(32),
+    padding: rs(30),
+    width: '100%',
+    marginTop: rs(-50),
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: rs(20),
+    elevation: 8,
   },
   logo: {
-    fontSize: rf(30),
+    fontSize: rf(28),
     fontWeight: '900',
     color: theme.primary,
-    letterSpacing: 1.5,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: rs(10),
   },
   title: {
     fontSize: rf(26),
     fontWeight: '800',
     color: theme.textDark,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: rs(10),
   },
   subtitle: {
-    fontSize: rf(16),
+    fontSize: rf(15),
     color: theme.textMuted,
     textAlign: 'center',
-    marginBottom: 28,
-    lineHeight: rf(24),
+    marginBottom: rs(24),
+    lineHeight: rf(22),
   },
   emailText: {
     color: theme.textDark,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   otpRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    gap: 12,
+    gap: rs(10),
+    marginBottom: rs(20),
   },
   otpBox: {
     flex: 1,
     aspectRatio: 1,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: theme.border,
-    borderRadius: 12,
-    fontSize: rf(28),
+    borderRadius: rs(12),
+    fontSize: rf(24),
     fontWeight: '800',
     textAlign: 'center',
     color: theme.textDark,
@@ -300,62 +351,118 @@ const styles = StyleSheet.create({
   },
   otpBoxFilled: {
     borderColor: theme.primary,
-    backgroundColor: '#E8F7F0',
+    backgroundColor: theme.lightGreen,
   },
   otpBoxError: {
     borderColor: theme.error,
   },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: rs(6),
+    marginBottom: rs(24),
+  },
+  timerText: {
+    fontSize: rf(15),
+    color: theme.textMuted,
+  },
+  timerHighlight: {
+    color: theme.primary,
+    fontWeight: 'bold',
+  },
   errorText: {
     color: theme.error,
-    fontSize: rf(15),
+    fontSize: rf(14),
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: rs(16),
   },
   button: {
     backgroundColor: theme.primary,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 16,
+    padding: rs(16),
+    borderRadius: rs(14),
     shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: rs(8),
     elevation: 4,
   },
+  buttonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: rs(10),
+  },
   buttonDisabled: {
-    opacity: 0.65,
+    opacity: 0.7,
   },
   buttonText: {
     color: theme.surface,
-    fontSize: rf(19),
-    fontWeight: '700',
+    fontSize: rf(18),
+    fontWeight: '800',
   },
-  resendRow: {
+  dividerRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: rs(24),
+    marginBottom: rs(16),
   },
-  resendLabel: {
-    fontSize: rf(16),
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.border,
+  },
+  dividerText: {
+    paddingHorizontal: rs(10),
+    fontSize: rf(14),
     color: theme.textMuted,
   },
-  resendLink: {
-    fontSize: rf(16),
-    color: theme.primary,
-    fontWeight: '600',
+  resendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: rs(10),
+    backgroundColor: theme.background,
+    paddingVertical: rs(14),
+    borderRadius: rs(12),
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  resendLinkDisabled: {
+  resendBtnDisabled: {
+    backgroundColor: '#F3F4F6',
+  },
+  resendBtnText: {
+    fontSize: rf(15),
+    color: theme.primary,
+    fontWeight: '700',
+  },
+  resendBtnTextDisabled: {
     color: theme.textMuted,
   },
   backButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
-    padding: 8,
+    justifyContent: 'center',
+    gap: rs(8),
+    marginTop: rs(24),
+    padding: rs(8),
   },
   backText: {
     fontSize: rf(16),
+    color: theme.primary,
+    fontWeight: '700',
+  },
+  footer: {
+    flexDirection: 'row',
+    marginTop: rs(30),
+    paddingHorizontal: rs(40),
+    alignItems: 'center',
+    gap: rs(10),
+  },
+  footerText: {
+    fontSize: rf(14),
     color: theme.textMuted,
+    lineHeight: rf(20),
+    flex: 1,
   },
 });

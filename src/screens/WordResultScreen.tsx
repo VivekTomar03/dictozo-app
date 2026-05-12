@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useStore } from '../store/useStore';
-import { rf } from '../utils/responsive';
+import { rf, rs } from '../utils/responsive';
 import { getWordDefinitions, getTranslation } from '../services/api';
 import { BackIcon, EditIcon, SaveIcon, CheckIcon } from '../components/Icons';
 import { Skeleton } from '../components/Skeleton';
@@ -52,6 +52,9 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
   const [isSaved, setIsSaved] = useState(false);
   const [customModalVisible, setCustomModalVisible] = useState(false);
   const [customDefinition, setCustomDefinition] = useState('');
+  const [replaceModalVisible, setReplaceModalVisible] = useState(false);
+  const [replacementWord, setReplacementWord] = useState('');
+  const [existingReplacement, setExistingReplacement] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (activeTab === 'Definition') {
@@ -60,10 +63,27 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
       loadTranslation(targetLang);
     }
     // Check if word already in favourites
-    if (favourites[word.toUpperCase()]) {
+    const wordKey = word.trim().toUpperCase();
+    const existingEntry = favourites[wordKey];
+
+    if (existingEntry) {
       setIsSaved(true);
+      try {
+        const entry = JSON.parse(existingEntry);
+        // If it's a replacement or has valid data, it's considered saved
+        if (entry.data?.[0]?.substitution || entry.data?.[0]?.replace) {
+          setExistingReplacement(entry.data[0].translatedText);
+        } else {
+          setExistingReplacement(null);
+        }
+      } catch (e) {
+        setExistingReplacement(null);
+      }
+    } else {
+      setIsSaved(false);
+      setExistingReplacement(null);
     }
-  }, [activeTab, word]);
+  }, [activeTab, word, favourites]);
 
   const handleLanguageChange = (langCode: string) => {
     setTargetLang(langCode);
@@ -218,6 +238,49 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
     }
   };
 
+  const handleSaveReplacement = async () => {
+    if (!replacementWord.trim()) {
+      Alert.alert('Error', 'Please enter a replacement word');
+      return;
+    }
+
+    const wordKey = word.trim().toUpperCase();
+    setSaving(true);
+    setReplaceModalVisible(false);
+
+    try {
+      const entry = {
+        data: [{
+          translatedText: replacementWord.trim(),
+          substitution: true,
+          replace: true
+        }],
+        url: 'substitution',
+        savedAt: new Date().toISOString(),
+      };
+
+      const entryJson = JSON.stringify(entry);
+      const nextFavs = { ...favourites, [wordKey]: entryJson };
+      const nextFavsJson = JSON.stringify(nextFavs);
+
+      const { syncUser } = await import('../services/api');
+      await syncUser(email, { favourites: nextFavsJson });
+
+      setFavourites(nextFavs);
+      setIsSaved(true);
+
+      const { saveWord: saveToDb } = await import('../services/db');
+      await saveToDb(word, `Replacement: ${replacementWord.trim()}`);
+
+      Alert.alert('Success', 'Word replacement saved!');
+      setReplacementWord('');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save replacement');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const DefinitionSkeleton = () => (
     <View style={{ gap: 12 }}>
       {[1, 2, 3].map(i => (
@@ -244,7 +307,15 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <BackIcon size={28} color={theme.textDark} strokeWidth={2.5} />
         </TouchableOpacity>
-        <Text style={styles.wordTitle}>{word}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.wordTitle}>{word}</Text>
+          <TouchableOpacity
+            style={styles.editIconButton}
+            onPress={() => setReplaceModalVisible(true)}
+          >
+            <EditIcon size={20} color={theme.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.tabRow}>
@@ -260,6 +331,21 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {existingReplacement && (
+          <View style={styles.replacementCard}>
+            <View style={styles.replacementHeader}>
+              <Text style={styles.replacementLabel}>Replacement</Text>
+              <TouchableOpacity onPress={() => {
+                setReplacementWord(existingReplacement);
+                setReplaceModalVisible(true);
+              }}>
+                <EditIcon size={16} color={theme.primary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.replacementText}>{existingReplacement}</Text>
+          </View>
+        )}
+
         {loading ? (
           activeTab === 'Definition' ? <DefinitionSkeleton /> : <TranslationSkeleton />
         ) : error ? (
@@ -372,6 +458,45 @@ export const WordResultScreen = ({ word, onBack }: { word: string, onBack: () =>
           </View>
         </View>
       </Modal>
+
+      {/* Replace Word Modal */}
+      <Modal
+        visible={replaceModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReplaceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Replace Word</Text>
+            <Text style={styles.modalSubTitle}>Whenever you see "{word}", show this instead:</Text>
+
+            <TextInput
+              style={styles.modalInputSingle}
+              placeholder="Enter replacement..."
+              placeholderTextColor={theme.textMuted}
+              value={replacementWord}
+              onChangeText={setReplacementWord}
+              autoFocus
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setReplaceModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                onPress={handleSaveReplacement}
+              >
+                <Text style={styles.modalSubmitText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -381,63 +506,73 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: rs(20),
     backgroundColor: theme.surface,
     borderBottomWidth: 1,
     borderBottomColor: theme.border
   },
-  backButton: { marginRight: 16 },
-  backIcon: { fontSize: 28, color: theme.textDark },
+  backButton: { marginRight: rs(16) },
+  titleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8)
+  },
   wordTitle: { fontSize: rf(28), fontWeight: 'bold', color: theme.textDark, textTransform: 'capitalize' },
+  editIconButton: {
+    padding: rs(4),
+    backgroundColor: theme.primaryLight,
+    borderRadius: rs(8),
+  },
   tabRow: { flexDirection: 'row', backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  tab: { flex: 1, paddingVertical: rs(14), alignItems: 'center' },
   activeTab: { borderBottomWidth: 3, borderBottomColor: theme.primary },
   tabText: { fontSize: rf(18), color: theme.textMuted, fontWeight: '600' },
   activeTabText: { color: theme.primary },
-  content: { padding: 20 },
+  content: { padding: rs(20) },
   defCard: {
     backgroundColor: theme.surface,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    padding: rs(16),
+    borderRadius: rs(12),
+    marginBottom: rs(16),
     borderWidth: 1,
     borderColor: theme.border
   },
   posBadge: {
     backgroundColor: theme.primaryLight,
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginBottom: 8
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(2),
+    borderRadius: rs(6),
+    marginBottom: rs(8)
   },
   posText: { color: theme.primary, fontSize: rf(14), fontWeight: 'bold' },
-  definitionText: { fontSize: rf(18), color: theme.textDark, lineHeight: rf(28), marginBottom: 8 },
-  exampleText: { fontSize: rf(16), color: theme.textMuted, fontStyle: 'italic', marginBottom: 4 },
+  definitionText: { fontSize: rf(18), color: theme.textDark, lineHeight: rf(28), marginBottom: rs(8) },
+  exampleText: { fontSize: rf(16), color: theme.textMuted, fontStyle: 'italic', marginBottom: rs(4) },
   transCard: {
     backgroundColor: theme.surface,
-    padding: 24,
-    borderRadius: 16,
+    padding: rs(24),
+    borderRadius: rs(16),
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: 'center'
   },
-  transText: { fontSize: rf(32), fontWeight: 'bold', color: theme.primary, marginBottom: 8 },
+  transText: { fontSize: rf(32), fontWeight: 'bold', color: theme.primary, marginBottom: rs(8) },
   sourceText: { fontSize: rf(16), color: theme.textMuted },
-  errorText: { color: theme.error, textAlign: 'center', marginTop: 40 },
-  emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: 40, fontSize: rf(18) },
+  errorText: { color: theme.error, textAlign: 'center', marginTop: rs(40) },
+  emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: rs(40), fontSize: rf(18) },
   footer: {
     flexDirection: 'row',
-    padding: 20,
+    padding: rs(20),
     backgroundColor: theme.surface,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    gap: 12
+    gap: rs(12)
   },
   btn: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: rs(16),
+    borderRadius: rs(12),
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -447,7 +582,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.primary,
     flexDirection: 'row',
-    gap: 8
+    gap: rs(8)
   },
   primaryBtnText: { color: theme.surface, fontSize: rf(18), fontWeight: 'bold' },
   secondaryBtnText: { color: theme.primary, fontSize: rf(18), fontWeight: 'bold' },
@@ -456,43 +591,64 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: 20
+    padding: rs(20)
   },
   modalContent: {
     backgroundColor: theme.surface,
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: rs(20),
+    padding: rs(24),
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 4
+    shadowRadius: rs(4)
   },
-  modalTitle: { fontSize: rf(24), fontWeight: 'bold', color: theme.textDark, marginBottom: 8 },
-  modalSubTitle: { fontSize: rf(16), color: theme.textMuted, marginBottom: 20 },
+  modalTitle: { fontSize: rf(24), fontWeight: 'bold', color: theme.textDark, marginBottom: rs(8) },
+  modalSubTitle: { fontSize: rf(16), color: theme.textMuted, marginBottom: rs(20) },
   modalInput: {
     backgroundColor: theme.background,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: rs(12),
+    padding: rs(16),
     fontSize: rf(18),
     color: theme.textDark,
-    height: 120,
+    height: rs(120),
     textAlignVertical: 'top',
-    marginBottom: 24,
+    marginBottom: rs(24),
     borderWidth: 1,
     borderColor: theme.border
   },
-  modalButtons: { flexDirection: 'row', gap: 12 },
-  modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  modalInputSingle: {
+    backgroundColor: theme.background,
+    borderRadius: rs(12),
+    padding: rs(16),
+    fontSize: rf(18),
+    color: theme.textDark,
+    marginBottom: rs(24),
+    borderWidth: 1,
+    borderColor: theme.border
+  },
+  modalButtons: { flexDirection: 'row', gap: rs(12) },
+  modalBtn: { flex: 1, paddingVertical: rs(14), borderRadius: rs(12), alignItems: 'center' },
   modalCancelBtn: { backgroundColor: theme.background },
   modalSubmitBtn: { backgroundColor: theme.primary },
   modalCancelText: { color: theme.textMuted, fontSize: rf(16), fontWeight: '600' },
   modalSubmitText: { color: theme.surface, fontSize: rf(16), fontWeight: 'bold' },
-  langSelector: { marginBottom: 20 },
-  langLabel: { fontSize: rf(14), fontWeight: 'bold', color: theme.textMuted, marginBottom: 10, marginLeft: 4 },
-  langList: { gap: 8 },
-  langBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
+  langSelector: { marginBottom: rs(20) },
+  langLabel: { fontSize: rf(14), fontWeight: 'bold', color: theme.textMuted, marginBottom: rs(10), marginLeft: rs(4) },
+  langList: { gap: rs(8) },
+  langBtn: { paddingHorizontal: rs(16), paddingVertical: rs(8), borderRadius: rs(20), backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
   langBtnActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   langBtnText: { color: theme.textDark, fontSize: rf(14), fontWeight: '600' },
-  langBtnTextActive: { color: theme.surface }
+  langBtnTextActive: { color: theme.surface },
+  replacementCard: {
+    backgroundColor: '#F0FDF4',
+    padding: rs(16),
+    borderRadius: rs(12),
+    marginBottom: rs(16),
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  replacementHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: rs(4) },
+  replacementLabel: { fontSize: rf(12), fontWeight: 'bold', color: theme.primary, textTransform: 'uppercase' },
+  replacementText: { fontSize: rf(20), fontWeight: 'bold', color: theme.textDark },
 });
