@@ -95,13 +95,7 @@ export const syncUser = async (
 // ─── 4.4 Get User Data ───────────────────────────────────────────────────────
 
 export const getUser = async (email: string): Promise<SyncResponse> => {
-  const { AppStorage } = await import('./storage');
-  return syncUser(email, {
-    language: AppStorage.getLang(),
-    favourites: JSON.stringify(AppStorage.getFavourites()),
-    mastered: JSON.stringify(AppStorage.getMastered()),
-    words: JSON.stringify(AppStorage.getSearchedWords()),
-  });
+  return syncUser(email, {});
 };
 
 // 4.4 Save Word logic

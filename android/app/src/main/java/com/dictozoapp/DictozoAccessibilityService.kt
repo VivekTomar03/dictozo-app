@@ -32,6 +32,25 @@ class DictozoAccessibilityService : AccessibilityService() {
     // Rate limit DB reads
     private var lastDbSync = 0L
 
+    // Supported web browser package names to restrict scanning
+    private val browserPackages = setOf(
+        "com.android.chrome",              // Google Chrome
+        "com.chrome.beta",                 // Google Chrome Beta
+        "com.chrome.dev",                  // Google Chrome Dev
+        "com.chrome.canary",               // Google Chrome Canary
+        "com.sec.android.app.sbrowser",    // Samsung Internet
+        "org.mozilla.firefox",             // Mozilla Firefox
+        "org.mozilla.focus",               // Firefox Focus
+        "com.microsoft.emmx",              // Microsoft Edge
+        "com.brave.browser",               // Brave Browser
+        "com.opera.browser",               // Opera
+        "com.opera.mini.native",           // Opera Mini
+        "com.duckduckgo.mobile.android",   // DuckDuckGo
+        "com.kiwibrowser.browser",         // Kiwi Browser
+        "com.vivaldi.browser",             // Vivaldi
+        "com.ecosia.android"               // Ecosia
+    )
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i("Dictozo", "Accessibility Service Connected")
@@ -52,6 +71,13 @@ class DictozoAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        val currentPackage = event.packageName?.toString() ?: return
+
+        // Only scan text and trigger overlays if the active app is a web browser
+        if (!browserPackages.contains(currentPackage)) {
+            return
+        }
+
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && 
             event.eventType != AccessibilityEvent.TYPE_VIEW_SCROLLED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&

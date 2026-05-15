@@ -50,10 +50,6 @@ export const runStartupSync = async (email: string): Promise<StartupResult> => {
 
   // Sync user data with server — merge server state into local
   const syncRes = await syncUser(email, {
-    language: AppStorage.getLang(),
-    favourites: JSON.stringify(AppStorage.getFavourites()),
-    mastered: JSON.stringify(AppStorage.getMastered()),
-    words: JSON.stringify(AppStorage.getSearchedWords()),
     open_count: 1,
   });
 
